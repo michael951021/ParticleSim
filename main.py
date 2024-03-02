@@ -21,7 +21,7 @@ BLUE = (0, 0, 255)
 
 # Constants
 gravity = 0.005
-k = 1000              # 8.99*10e9
+k = 10000              # 8.99*10e9
 
 # Ball class
 class Atom:
@@ -29,6 +29,7 @@ class Atom:
         # intrinsic
         self.radius = 20
         self.mass = 1  # in 'grams'
+        self.velocitybuffer = [vx,vy]
 
         self.x = x
         self.y = y
@@ -50,20 +51,25 @@ class Atom:
         # Wall collision
         if self.y + self.radius >= height:
             self.y = height - self.radius
-            self.velocity[1] = -self.velocity[1]
+            self.velocitybuffer[1] = -self.velocity[1]
         elif self.y - self.radius <= 0:
             self.y = self.radius
-            self.velocity[1] = -self.velocity[1]
+            self.velocitybuffer[1] = -self.velocity[1]
         if self.x + self.radius >= width:
             self.x = width - self.radius
-            self.velocity[0] = -self.velocity[0]
+            self.velocitybuffer[0] = -self.velocity[0]
         elif self.x - self.radius <= 0:
             self.x = self.radius
-            self.velocity[0] = -self.velocity[0]
+            self.velocitybuffer[0] = -self.velocity[0]
 
     def isColliding(self, p2):
         if self.dist(p2) <= self.radius + p2.radius:
             return True
+
+    def collision(self, p2):
+        self.velocitybuffer[0] = (self.mass-p2.mass)*self.velocity[0]/(self.mass+p2.mass) + 2*p2.mass*p2.velocity[0]/(self.mass+p2.mass)
+        self.velocitybuffer[1] = (self.mass - p2.mass) * self.velocity[1] / (self.mass + p2.mass) + 2 * p2.mass * p2.velocity[1] / (self.mass + p2.mass)
+
 
     def dist(self, p2):
         return math.sqrt((p2.x-self.x)**2 + (p2.y - self.y)**2)
@@ -74,29 +80,38 @@ class Atom:
             if self != p[i] and self.dist(p[i]) != 0:  # might needa change to radius sum
                 f = abs(k*self.charge*p[i].charge)/(self.dist(p[i])**2)
                 t = math.atan2(p[i].y - self.y,p[i].x-self.x)
-                print("t: "+str(t))
+                # print("t: "+str(t))
                 if self.charge * p[i].charge > 0:
                     t += math.pi
                 force_sum[0] += f*math.cos(t)
                 force_sum[1] += f*math.sin(t)
-                print(math.atan2(force_sum[1],force_sum[0]))
+                # print(math.atan2(force_sum[1],force_sum[0]))
         self.ft = [math.sqrt(force_sum[0]**2+force_sum[1]**2),math.atan2(force_sum[1],force_sum[0])]
         #print(str(self.x) + " " + str(self.y) + " : " + str(self.ft[1]))
 
     def updateVelocities(self, dt):
-        self.velocity[0] += self.ft[0] * math.cos(self.ft[1]) * dt / self.mass
-        self.velocity[1] += self.ft[0] * math.sin(self.ft[1]) * dt / self.mass
+        # print("cos: "+ str(math.cos(self.ft[1]) * dt / self.mass))
+        # print(math.sin(self.ft[1]) * dt / self.mass)
+        # print(self.ft[0] * math.cos(self.ft[1]))
+        # print(dt)
+        # print(self.ft[0] * math.cos(self.ft[1]) * dt)
+        self.velocitybuffer[0] += self.ft[0] * math.cos(self.ft[1]) * dt / self.mass
+        self.velocitybuffer[1] += self.ft[0] * math.sin(self.ft[1]) * dt / self.mass
 
     def drawVelocityVectors(self):
         pygame.draw.polygon(screen, BLACK, ((self.x-5,self.y),(self.x+self.velocity[0]*500,self.y+self.velocity[1]*500),(self.x+5,self.y)))
 
+    def pushBuffer(self):
+        self.velocity[0] = self.velocitybuffer[0]
+        self.velocity[1] = self.velocitybuffer[1]
+
     def drawForceVectors(self):
-        print(self.ft[0])
-        print(self.ft[1])
-        print("self: " + str(self.x))
-        print(self.x+self.ft[0]*math.cos(self.ft[1])*5)
-        print(self.y+self.ft[0]*math.sin(self.ft[1])*5)
-        pygame.draw.polygon(screen, GREEN, ((self.x-5,self.y),(int(self.x+self.ft[0]*math.cos(self.ft[1])*1e5),int(self.y+self.ft[0]*math.sin(self.ft[1])*1e5)),(self.x+5,self.y)))
+        # print(self.ft[0])
+        # print(self.ft[1])
+        # print("self: " + str(self.x))
+        # print(self.x+self.ft[0]*math.cos(self.ft[1])*5)
+        # print(self.y+self.ft[0]*math.sin(self.ft[1])*5)
+        pygame.draw.polygon(screen, GREEN, ((self.x-5,self.y),(int(self.x+self.ft[0]*math.cos(self.ft[1])*1e4),int(self.y+self.ft[0]*math.sin(self.ft[1])*1e4)),(self.x+5,self.y)))
 
 
 
@@ -104,8 +119,8 @@ class Atom:
 atoms = [Atom(50, 50, 0.01, -0.1, -1),Atom(width-50,height-50,-0.1,0.1, 1)]
 
 # Main loop
-now = datetime.now()
-oldt = now.microsecond
+dt = 0.001  # time (seconds) every loop
+time_elapsed = 0;
 while True:
     screen.fill(WHITE)
 
@@ -118,8 +133,6 @@ while True:
         atoms[i].updateForce(atoms)
 
     # Update velocities
-    now = datetime.now()
-    dt = (now.microsecond - oldt) * (10 ** (-6))
     if dt != 0:
         for i in range(len(atoms)):
             atoms[i].updateVelocities(dt)
@@ -128,6 +141,17 @@ while True:
     for i in range(len(atoms)):
         atoms[i].drawForceVectors()
         atoms[i].drawVelocityVectors()
+
+    # Check for collision
+    for i in range(len(atoms)):
+        for j in range(i+1,len(atoms)):
+            if atoms[i].isColliding(atoms[j]):
+                print("a")
+                atoms[i].collision(atoms[j])
+
+    # Push velocities
+    for i in range(len(atoms)):
+        atoms[i].pushBuffer()
 
     # Update positions
     for i in range(len(atoms)):
@@ -138,3 +162,4 @@ while True:
         atoms[i].draw()
 
     pygame.display.flip()
+    time_elapsed += dt;

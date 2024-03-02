@@ -69,6 +69,10 @@ class Atom:
     def collision(self, p2):
         self.velocitybuffer[0] = (self.mass-p2.mass)*self.velocity[0]/(self.mass+p2.mass) + 2*p2.mass*p2.velocity[0]/(self.mass+p2.mass)
         self.velocitybuffer[1] = (self.mass - p2.mass) * self.velocity[1] / (self.mass + p2.mass) + 2 * p2.mass * p2.velocity[1] / (self.mass + p2.mass)
+        print("p2 y velo: " + str(p2.velocity[1]))
+        print("vx: " + str(self.velocitybuffer[0]))
+        print("vy: " + str(self.velocitybuffer[1]))
+
 
 
     def dist(self, p2):
@@ -113,6 +117,15 @@ class Atom:
         # print(self.y+self.ft[0]*math.sin(self.ft[1])*5)
         pygame.draw.polygon(screen, GREEN, ((self.x-5,self.y),(int(self.x+self.ft[0]*math.cos(self.ft[1])*1e4),int(self.y+self.ft[0]*math.sin(self.ft[1])*1e4)),(self.x+5,self.y)))
 
+    def slingAtom(self, posi, posf):
+        dx = posi[0] - posf[0]
+        dy = posi[1] - posi[1]
+        f = math.sqrt(dx**2 + dy**2)
+        t = math.atan2(dy,dx)
+        fx = self.ft[0] * math.cos(self.ft[1]) + f * math.cos(t)
+        fy = self.ft[0] * math.sin(self.ft[1]) + f * math.sin(t)
+        self.ft[0] = math.sqrt(fx**2+fy**2)
+        self.ft[1] = math.atan2(fy,fx)
 
 
 # Create molecules
@@ -121,6 +134,11 @@ atoms = [Atom(50, 50, 0.01, -0.1, -1),Atom(width-50,height-50,-0.1,0.1, 1)]
 # Main loop
 dt = 0.001  # time (seconds) every loop
 time_elapsed = 0;
+
+pull_initial = [0,0]
+pull_final = [0,0]
+pull_index = -1
+
 while True:
     screen.fill(WHITE)
 
@@ -128,9 +146,26 @@ while True:
         if event.type == pygame.QUIT:
             pygame.quit()
             sys.exit()
+        elif event.type == pygame.MOUSEBUTTONDOWN:
+            pos = pygame.mouse.get_pos()
+            for i in range(len(atoms)):
+                if (pos[0]-atoms[i].x)**2 + (pos[1]-atoms[i].y)**2 < atoms[i].radius:
+                    pull_index = i
+                    pull_initial[0] = pos[0]
+                    pull_initial[1] = pos[1]
+                    print(pull_initial)
+        elif event.type == pygame.MOUSEBUTTONUP:
+            pos = pygame.mouse.get_pos()
+            if pull_index != -1:
+                pull_final[0] = pos[0]
+                pull_final[1] = pos[1]
+                atoms[pull_index].slingAtom(pull_initial,pull_final)
+                pull_index = -1
     # Update forces
     for i in range(len(atoms)):
         atoms[i].updateForce(atoms)
+
+
 
     # Update velocities
     if dt != 0:
@@ -146,8 +181,10 @@ while True:
     for i in range(len(atoms)):
         for j in range(i+1,len(atoms)):
             if atoms[i].isColliding(atoms[j]):
-                print("a")
+                # print("a")
+                print("atom " + str(i))
                 atoms[i].collision(atoms[j])
+                atoms[j].collision(atoms[i])
 
     # Push velocities
     for i in range(len(atoms)):

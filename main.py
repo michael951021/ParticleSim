@@ -18,6 +18,7 @@ BLACK = (0, 0, 0)
 RED = (255, 0, 0)
 GREEN = (0, 255, 0)
 BLUE = (0, 0, 255)
+CYAN = (0, 127, 127)
 
 # Constants
 gravity = 0.005
@@ -117,25 +118,30 @@ class Atom:
         # print(self.y+self.ft[0]*math.sin(self.ft[1])*5)
         pygame.draw.polygon(screen, GREEN, ((self.x-5,self.y),(int(self.x+self.ft[0]*math.cos(self.ft[1])*1e4),int(self.y+self.ft[0]*math.sin(self.ft[1])*1e4)),(self.x+5,self.y)))
 
-    def slingAtom(self, posi, posf):
-        dx = posi[0] - posf[0]
-        dy = posi[1] - posi[1]
-        f = math.sqrt(dx**2 + dy**2)
+    def drawSling(self, pos):
+        pygame.draw.polygon(screen, CYAN, ((self.x-5,self.y),(pos[0],pos[1]),(self.x+5,self.y)))
+
+    def slingAtom(self, posf):
+        dx = self.x - posf[0]
+        dy = self.y - posf[1]
+        f = math.sqrt(dx**2 + dy**2)/1000
+        print("force: "+ str(f))
         t = math.atan2(dy,dx)
-        fx = self.ft[0] * math.cos(self.ft[1]) + f * math.cos(t)
-        fy = self.ft[0] * math.sin(self.ft[1]) + f * math.sin(t)
-        self.ft[0] = math.sqrt(fx**2+fy**2)
-        self.ft[1] = math.atan2(fy,fx)
+        self.velocitybuffer[0] += f * math.cos(t)
+        self.velocitybuffer[1] += f * math.sin(t)
+        # fx = self.ft[0] * math.cos(self.ft[1]) + f * math.cos(t)
+        # fy = self.ft[0] * math.sin(self.ft[1]) + f * math.sin(t)
+        # self.ft[0] = math.sqrt(fx**2+fy**2)
+        # self.ft[1] = math.atan2(fy,fx)
 
 
 # Create molecules
 atoms = [Atom(50, 50, 0.01, -0.1, -1),Atom(width-50,height-50,-0.1,0.1, 1)]
 
 # Main loop
-dt = 0.001  # time (seconds) every loop
+dt = 0.00001  # time (seconds) every loop
 time_elapsed = 0;
 
-pull_initial = [0,0]
 pull_final = [0,0]
 pull_index = -1
 
@@ -149,18 +155,18 @@ while True:
         elif event.type == pygame.MOUSEBUTTONDOWN:
             pos = pygame.mouse.get_pos()
             for i in range(len(atoms)):
-                if (pos[0]-atoms[i].x)**2 + (pos[1]-atoms[i].y)**2 < atoms[i].radius:
+                if (pos[0]-atoms[i].x)**2 + (pos[1]-atoms[i].y)**2 < atoms[i].radius*40:
                     pull_index = i
-                    pull_initial[0] = pos[0]
-                    pull_initial[1] = pos[1]
-                    print(pull_initial)
+                    print(pull_index)
         elif event.type == pygame.MOUSEBUTTONUP:
             pos = pygame.mouse.get_pos()
             if pull_index != -1:
                 pull_final[0] = pos[0]
                 pull_final[1] = pos[1]
-                atoms[pull_index].slingAtom(pull_initial,pull_final)
+                atoms[pull_index].slingAtom(pull_final)
                 pull_index = -1
+    if pull_index != -1:
+        atoms[pull_index].drawSling(pygame.mouse.get_pos())
     # Update forces
     for i in range(len(atoms)):
         atoms[i].updateForce(atoms)
